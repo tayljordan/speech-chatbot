@@ -1,0 +1,16 @@
+# Secrets
+.env
+
+# Local environment
+.venv/
+__pycache__/
+
+# Voice recordings are personal data and never belong in the repo
+recordings/
+*.wav
+*.mp3
+*.m4a
+*.webm
+
+# Early standalone recorder prototype, superseded by voice_studio.html
+recorder.html

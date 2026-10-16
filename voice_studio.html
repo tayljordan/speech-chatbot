@@ -1,0 +1,930 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>தமிழ் · English</title>
+<style>
+  :root {
+    --bg: #f4f6f9; --card: #ffffff; --ink: #0f1c2e; --muted: #64748b; --line: #e2e8f0;
+    --navy: #0b2545; --navy-2: #1d4e89; --teal: #14b8a6; --teal-soft: rgba(20, 184, 166, .16);
+    --user: #0b2545; --user-ink: #ffffff; --bot: #f1f5f9;
+    --danger: #dc2626; --ok: #0f766e;
+    --shadow: 0 1px 2px rgba(15, 28, 46, .05), 0 8px 24px rgba(15, 28, 46, .06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b1220; --card: #111a2b; --ink: #e8eef7; --muted: #94a3b8; --line: #1e2a3d;
+      --navy: #1d4e89; --navy-2: #3b82c4; --teal: #2dd4bf; --teal-soft: rgba(45, 212, 191, .18);
+      --user: #1d4e89; --user-ink: #ffffff; --bot: #172235;
+      --danger: #f87171; --ok: #2dd4bf;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .25);
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Tamil", sans-serif;
+    display: flex; justify-content: center; padding: 24px 16px 32px;
+  }
+  main { width: 100%; max-width: 640px; display: grid; gap: 20px; align-content: start; }
+  button {
+    font: inherit; font-weight: 600; border-radius: 999px; padding: 9px 18px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--card); color: var(--ink);
+  }
+  button:disabled { opacity: .4; cursor: default; }
+  .icon-btn {
+    display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px;
+    border-color: transparent; background: none; color: var(--muted); font-size: 14px; font-weight: 500;
+  }
+  .icon-btn:hover:not(:disabled) { color: var(--ink); background: var(--card); }
+  .icon-btn svg { width: 18px; height: 18px; }
+  .msg { font-size: 14px; min-height: 1.4em; margin-top: 8px; }
+  .msg.err { color: var(--danger); }
+  .msg.ok { color: var(--ok); }
+
+  /* Header */
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand .mark {
+    width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
+    background: linear-gradient(135deg, var(--navy-2), var(--navy)); color: #fff;
+  }
+  .brand .mark svg { width: 18px; height: 18px; }
+  .brand strong { display: block; font-size: 15px; line-height: 1.2; }
+  .brand span { display: block; font-size: 12px; color: var(--muted); }
+  .header-actions { display: flex; gap: 2px; }
+
+  /* Assistant stage */
+  .stage {
+    background: var(--card); border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--shadow);
+    padding: 36px 20px 28px; display: grid; justify-items: center; gap: 18px; text-align: center;
+  }
+  .orb-wrap { position: relative; width: 168px; height: 168px; display: grid; place-items: center; --level: 0; }
+  .orb-wrap::before, .orb-wrap::after {
+    content: ""; position: absolute; inset: 14px; border-radius: 50%; pointer-events: none;
+    transition: transform 80ms linear, opacity .2s;
+  }
+  .orb-wrap::before { background: var(--teal-soft); opacity: 0; }
+  .orb-wrap::after { border: 3px solid transparent; opacity: 0; }
+  .orb {
+    position: relative; z-index: 1; width: 124px; height: 124px; border-radius: 50%; padding: 0; border: none;
+    background: radial-gradient(circle at 32% 28%, var(--navy-2), var(--navy) 70%); color: #fff;
+    box-shadow: 0 10px 28px rgba(11, 37, 69, .35); display: grid; place-items: center;
+    transition: transform .15s ease, box-shadow .2s;
+  }
+  .orb:hover:not(:disabled) { transform: scale(1.03); }
+  .orb:active:not(:disabled) { transform: scale(.97); }
+  .orb svg { width: 44px; height: 44px; }
+  .orb .i-stop { display: none; }
+
+  body[data-state="listening"] .orb { background: radial-gradient(circle at 32% 28%, #2dd4bf, #0f766e 72%); }
+  body[data-state="listening"] .orb .i-mic { display: none; }
+  body[data-state="listening"] .orb .i-stop { display: block; }
+  body[data-state="listening"] .orb-wrap::before { opacity: 1; transform: scale(calc(1 + var(--level) * .55)); }
+
+  body[data-state="thinking"] .orb-wrap::after,
+  body[data-state="connecting"] .orb-wrap::after {
+    opacity: 1; inset: 8px; border-color: var(--teal) transparent var(--teal) transparent;
+    animation: spin 1s linear infinite;
+  }
+  body[data-state="speaking"] .orb-wrap::before { opacity: 1; animation: breathe 1.6s ease-in-out infinite; }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.22); } }
+
+  .status { font-size: 17px; font-weight: 600; min-height: 1.5em; }
+  .status.err { color: var(--danger); }
+  .sub { color: var(--muted); font-size: 14px; margin-top: -12px; min-height: 1.4em; }
+
+  /* Transcript */
+  .transcript {
+    background: var(--card); border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--shadow);
+    padding: 18px 18px 20px;
+  }
+  .transcript-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .transcript-head h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0; }
+  .chat { display: grid; gap: 12px; max-height: 46vh; overflow-y: auto; padding: 2px; }
+  .empty { color: var(--muted); font-size: 14px; text-align: center; padding: 14px 6px; display: grid; gap: 10px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .chip { font-size: 13px; padding: 6px 12px; border-radius: 999px; background: var(--bot); border: 1px solid var(--line); color: var(--ink); }
+  .bubble {
+    padding: 12px 14px; border-radius: 12px; display: grid; gap: 4px; text-align: left;
+    background: var(--bg); border: 1px solid var(--line);
+  }
+  .bubble .lang { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .bubble.pending { opacity: .6; font-style: italic; }
+  .bubble .tools { display: flex; gap: 2px; margin: 2px 0 -4px -8px; align-items: center; }
+  .bubble .tools .icon-btn { padding: 4px 8px; font-size: 12px; }
+  .bubble .tools .icon-btn svg { width: 15px; height: 15px; }
+  .bubble .note { font-size: 12px; color: var(--muted); }
+  .bubble .timing { font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); }
+  .consent { font-size: 12px; color: var(--muted); max-width: 460px; line-height: 1.5; margin-top: -4px; }
+  .stats-body { padding: 16px 20px 22px; display: grid; gap: 18px; }
+  .stats-body h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 8px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+  .tile { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+  .tile .v { font-size: 20px; font-weight: 700; }
+  .tile .k { font-size: 12px; color: var(--muted); }
+  .bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 6px; }
+  .bar > div { height: 100%; background: var(--teal); }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; white-space: normal; }
+  th { color: var(--muted); font-weight: 600; }
+  td { font-variant-numeric: tabular-nums; }
+  .stats-foot { font-size: 12px; color: var(--muted); }
+  .stats-foot a { color: var(--muted); }
+  dialog.wide { width: min(760px, calc(100vw - 32px)); }
+
+  footer { text-align: center; color: var(--muted); font-size: 12px; line-height: 1.6; }
+  footer strong { color: var(--ink); font-weight: 600; }
+  footer a { color: var(--muted); }
+
+  /* Settings dialog */
+  dialog {
+    width: min(520px, calc(100vw - 32px)); border: 1px solid var(--line); border-radius: 20px; padding: 0;
+    background: var(--card); color: var(--ink); box-shadow: 0 24px 64px rgba(0, 0, 0, .25);
+  }
+  dialog::backdrop { background: rgba(11, 18, 32, .45); }
+  .dlg-head { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+  .dlg-head h2 { font-size: 16px; margin: 0; }
+  .dlg-body { padding: 18px 20px 22px; display: grid; gap: 14px; }
+  .field { display: grid; gap: 6px; }
+  .field label { font-size: 13px; font-weight: 600; color: var(--muted); }
+  select, input[type=text] {
+    font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+    border-radius: 10px; padding: 9px 12px; width: 100%;
+  }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .row select { flex: 1; min-width: 0; width: auto; }
+  .divider { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
+  button.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+  button.small { padding: 6px 14px; font-size: 13px; }
+
+  /* New voice recorder (inside settings) */
+  .newvoice { border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: grid; gap: 10px; }
+  .script { background: var(--bg); border-radius: 10px; padding: 10px 12px; color: var(--muted); font-size: 13px; }
+  .script strong { color: var(--ink); }
+  .recbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .rec { background: var(--danger); border-color: var(--danger); color: #fff; }
+  .rec.on { animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .7; } }
+  .timer { font: 600 18px/1 ui-monospace, SFMono-Regular, Menlo, monospace; min-width: 48px; }
+  .meter { flex: 1; min-width: 100px; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+  .meter > div { height: 100%; width: 0%; background: var(--teal); transition: width 60ms linear; }
+  .progress { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; }
+  .progress > div { height: 100%; width: 0%; background: var(--danger); transition: width 100ms linear; }
+</style>
+</head>
+<body data-state="idle">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v5M8 22h8"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2.5"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+  <symbol id="i-new" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.9l10.5-6.5a1 1 0 0 0 0-1.8L9.5 4.6A1 1 0 0 0 8 5.5z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12M6 11l6 6 6-6M5 21h14"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+  <symbol id="i-wave" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/></symbol>
+</svg>
+
+<main>
+  <header>
+    <div class="brand">
+      <div class="mark"><svg><use href="#i-wave"/></svg></div>
+      <div><strong>தமிழ் · English</strong></div>
+    </div>
+    <div class="header-actions">
+      <button class="icon-btn" id="newChatBtn" title="Start a new conversation"><svg><use href="#i-new"/></svg>New</button>
+      <button class="icon-btn" id="statsBtn" title="Usage and performance"><svg><use href="#i-chart"/></svg>Stats</button>
+      <button class="icon-btn" id="settingsBtn" title="Voice settings"><svg><use href="#i-gear"/></svg>Voices</button>
+    </div>
+  </header>
+
+  <section class="stage">
+    <div class="orb-wrap" id="orbWrap">
+      <button class="orb" id="talkBtn" aria-label="Tap to speak" disabled>
+        <svg class="i-mic"><use href="#i-mic"/></svg>
+        <svg class="i-stop"><use href="#i-stop"/></svg>
+      </button>
+    </div>
+    <div class="status" id="status">Tap to speak</div>
+    <div class="sub" id="sub">தமிழில் பேசுங்கள் — or speak English.</div>
+    <p class="consent" id="consent">
+      Your voice is sent to Google Gemini and ElevenLabs to understand and answer you, and conversations are saved.
+      By tapping the microphone you agree to this.<br>
+      உங்கள் குரல் புரிந்துகொண்டு பதிலளிக்க Google Gemini மற்றும் ElevenLabs-க்கு அனுப்பப்படும்; உரையாடல்கள் சேமிக்கப்படும்.
+      மைக்கை அழுத்துவதன் மூலம் இதற்கு ஒப்புக்கொள்கிறீர்கள்.
+    </p>
+  </section>
+
+  <section class="transcript">
+    <div class="transcript-head"><h2>Latest</h2></div>
+    <div class="chat" id="chat">
+      <div class="empty" id="chatEmpty">
+        <div>What you say and the reply will appear here. Try asking:</div>
+        <div class="chips">
+          <span class="chip">“கப்பல் பாதுகாப்பு ஏன் முக்கியம்?”</span>
+          <span class="chip">“What is AMET known for?”</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Originated by <strong>Project Harrison</strong><br>
+    <a href="/logout">Log out</a>
+  </footer>
+</main>
+
+<!-- Usage and performance -->
+<dialog id="statsDlg" class="wide">
+  <div class="dlg-head">
+    <h2>Stats</h2>
+    <div class="row">
+      <select id="statsDays" aria-label="Time window">
+        <option value="1">Last 24 hours</option>
+        <option value="7" selected>Last 7 days</option>
+        <option value="30">Last 30 days</option>
+      </select>
+      <button class="icon-btn" id="closeStats" aria-label="Close"><svg><use href="#i-close"/></svg></button>
+    </div>
+  </div>
+  <div class="stats-body" id="statsBody">Loading…</div>
+</dialog>
+
+<!-- Voice settings -->
+<dialog id="settings">
+  <div class="dlg-head">
+    <h2>Voices</h2>
+    <button class="icon-btn" id="closeSettings" aria-label="Close"><svg><use href="#i-close"/></svg></button>
+  </div>
+  <div class="dlg-body">
+    <div class="field">
+      <label for="voiceTa">தமிழ் replies</label>
+      <select id="voiceTa"><option>Loading voices…</option></select>
+    </div>
+    <div class="field">
+      <label for="voiceEn">English replies</label>
+      <select id="voiceEn"><option>Loading voices…</option></select>
+    </div>
+    <hr class="divider">
+    <div class="row" id="voiceActions">
+      <button class="small" id="newVoiceBtn">+ New voice</button>
+      <button class="icon-btn" id="deleteBtn" disabled>Delete a voice…</button>
+    </div>
+    <div class="row" id="confirmActions" hidden>
+      <select id="deleteSelect"></select>
+      <button class="small" id="keepBtn">Cancel</button>
+      <button class="small danger" id="confirmDeleteBtn">Delete</button>
+    </div>
+    <div class="msg" id="voiceMsg"></div>
+
+    <div class="newvoice" id="newVoice" hidden>
+      <input type="text" id="voiceName" placeholder="Voice name (optional)">
+      <div class="script">
+        Press <strong>Record</strong> and read aloud. It stops by itself after <strong>30 seconds</strong>
+        and the voice is created automatically.<br><br>
+        “The morning light came in slowly over the harbor, catching the edges of the boats as they rocked
+        against the dock. I've always liked this time of day, before the noise starts, when you can hear
+        the gulls and the water and your own thoughts. Today I want to talk about something I care about,
+        and I'll take my time explaining it, clearly and calmly, the way I'd tell a friend.”
+      </div>
+      <div class="recbar">
+        <button class="small rec" id="recBtn">Record</button>
+        <span class="timer" id="timer">0:30</span>
+        <div class="meter"><div id="level"></div></div>
+        <button class="small" id="cancelBtn">Cancel</button>
+      </div>
+      <div class="progress"><div id="progress"></div></div>
+      <div class="msg" id="createMsg"></div>
+    </div>
+  </div>
+</dialog>
+
+<script>
+const $ = id => document.getElementById(id);
+
+function show(el, text, kind = '') {
+  el.textContent = text;
+  el.className = 'msg' + (kind ? ' ' + kind : '');
+}
+const store = {
+  get: k => { try { return localStorage.getItem(k); } catch { return null; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
+};
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  if (r.status === 401) { location.href = '/login'; throw new Error('Please log in again.'); }
+  if (!r.ok) {
+    let msg = `Request failed (${r.status})`;
+    try { msg = (await r.json()).error || msg; } catch {}
+    throw new Error(msg);
+  }
+  return r;
+}
+
+/* ---------- Settings dialog ---------- */
+$('settingsBtn').onclick = () => $('settings').showModal();
+$('closeSettings').onclick = () => $('settings').close();
+$('settings').addEventListener('click', e => { if (e.target === $('settings')) $('settings').close(); });
+
+/* ---------- Voices ---------- */
+const voicePickers = { en: $('voiceEn'), ta: $('voiceTa') };
+const voiceKey = lang => `voiceStudio.voice2.${lang}`;
+
+async function loadVoices() {
+  try {
+    const { voices, defaults } = await (await api('/api/voices')).json();
+    const options = voices.length
+      ? voices.map(v => `<option value="${v.voice_id}">${v.name.replace(/</g, '&lt;')}</option>`).join('')
+      : '<option value="" disabled selected>No voices yet — record one</option>';
+    for (const [lang, select] of Object.entries(voicePickers)) {
+      select.innerHTML = options;
+      const want = [store.get(voiceKey(lang)), defaults[lang]].find(id => voices.some(v => v.voice_id === id));
+      if (want) select.value = want;
+      else if (voices.length) select.value = voices[0].voice_id;
+    }
+    $('deleteSelect').innerHTML = options;
+    if (!voices.length) {
+      show($('voiceMsg'), 'Record a new voice to get started.');
+      $('newVoice').hidden = false;
+      $('settings').showModal();
+    }
+  } catch (e) {
+    for (const select of Object.values(voicePickers)) select.innerHTML = '<option value="">Could not load voices</option>';
+    setStatus(e.message, true);
+  }
+  updateControls();
+}
+for (const [lang, select] of Object.entries(voicePickers)) {
+  select.onchange = () => { store.set(voiceKey(lang), select.value); show($('voiceMsg'), 'Saved.', 'ok'); };
+}
+
+function confirmMode(on) {
+  $('voiceActions').hidden = on;
+  $('confirmActions').hidden = !on;
+}
+$('deleteBtn').onclick = () => {
+  show($('voiceMsg'), "Pick the voice to delete. This can't be undone — you'd need to record it again.", 'err');
+  confirmMode(true);
+};
+$('keepBtn').onclick = () => { confirmMode(false); show($('voiceMsg'), ''); };
+$('confirmDeleteBtn').onclick = async () => {
+  const select = $('deleteSelect'), id = select.value, name = select.selectedOptions[0]?.textContent;
+  $('confirmDeleteBtn').disabled = true;
+  try {
+    await api(`/api/voices/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    confirmMode(false);
+    await loadVoices();
+    show($('voiceMsg'), `“${name}” was deleted.`, 'ok');
+  } catch (e) {
+    show($('voiceMsg'), e.message, 'err');
+  }
+  $('confirmDeleteBtn').disabled = false;
+};
+
+/* ---------- New voice: fixed 30 s recording, then created automatically ---------- */
+const REC_SECONDS = 30;
+let stream, recorder, chunks, audioCtx, rafId, tickId, stopTimer, startedAt, cancelled;
+
+function resetRecorder() {
+  $('recBtn').disabled = false; $('recBtn').classList.remove('on'); $('recBtn').textContent = 'Record';
+  $('timer').textContent = `0:${REC_SECONDS}`;
+  $('progress').style.width = '0%';
+  $('level').style.width = '0%';
+}
+
+function releaseMic() {
+  clearTimeout(stopTimer); clearInterval(tickId); cancelAnimationFrame(rafId);
+  stream?.getTracks().forEach(t => t.stop());
+  if (audioCtx && audioCtx.state !== 'closed') audioCtx.close();
+  $('level').style.width = '0%';
+}
+
+$('newVoiceBtn').onclick = () => { $('newVoice').hidden = false; show($('createMsg'), ''); };
+$('cancelBtn').onclick = () => {
+  if (recorder?.state === 'recording') { cancelled = true; recorder.stop(); releaseMic(); }
+  resetRecorder(); show($('createMsg'), '');
+  $('newVoice').hidden = true;
+};
+
+$('recBtn').onclick = async () => {
+  show($('createMsg'), '');
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+    });
+  } catch (e) {
+    return show($('createMsg'), `Microphone unavailable: ${e.message}`, 'err');
+  }
+  chunks = []; cancelled = false;
+  recorder = new MediaRecorder(stream);
+  recorder.ondataavailable = e => e.data.size && chunks.push(e.data);
+  recorder.onstop = () => { if (!cancelled) createVoice(); };
+  recorder.start(250);
+
+  audioCtx = new AudioContext();
+  const analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 1024;
+  audioCtx.createMediaStreamSource(stream).connect(analyser);
+  const buf = new Float32Array(analyser.fftSize);
+  (function draw() {
+    analyser.getFloatTimeDomainData(buf);
+    const rms = Math.sqrt(buf.reduce((a, v) => a + v * v, 0) / buf.length);
+    $('level').style.width = `${Math.min(100, rms * 400)}%`;
+    rafId = requestAnimationFrame(draw);
+  })();
+
+  startedAt = performance.now();
+  tickId = setInterval(() => {
+    const elapsed = (performance.now() - startedAt) / 1000;
+    const left = Math.max(0, Math.ceil(REC_SECONDS - elapsed));
+    $('timer').textContent = `0:${String(left).padStart(2, '0')}`;
+    $('progress').style.width = `${Math.min(100, elapsed / REC_SECONDS * 100)}%`;
+  }, 100);
+  stopTimer = setTimeout(() => { recorder.stop(); releaseMic(); }, REC_SECONDS * 1000);
+
+  $('recBtn').disabled = true; $('recBtn').classList.add('on'); $('recBtn').textContent = 'Recording…';
+  show($('createMsg'), 'Recording — keep talking until the timer runs out.');
+};
+
+async function createVoice() {
+  $('timer').textContent = '0:00'; $('progress').style.width = '100%';
+  $('recBtn').classList.remove('on'); $('recBtn').textContent = 'Stopped';
+  show($('createMsg'), 'Recording stopped. Creating your new voice…');
+  const name = $('voiceName').value.trim() ||
+    `My voice ${new Date().toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`;
+  try {
+    const wav = await toWav(new Blob(chunks, { type: recorder.mimeType }));
+    const form = new FormData();
+    form.append('name', name);
+    form.append('audio', wav, 'sample.wav');
+    await api('/api/voices', { method: 'POST', body: form });
+    await loadVoices();
+    show($('voiceMsg'), `Your new voice “${name}” is ready. Choose it for தமிழ் or English above.`, 'ok');
+    $('newVoice').hidden = true; $('voiceName').value = '';
+    show($('createMsg'), '');
+    resetRecorder();
+  } catch (e) {
+    show($('createMsg'), `Could not create the voice: ${e.message}. Press Record to try again.`, 'err');
+    resetRecorder();
+  }
+}
+
+// Decode whatever the browser recorded and re-encode as 16-bit mono WAV,
+// optionally resampled (16 kHz keeps speech uploads small).
+async function toWav(blob, targetRate) {
+  const ctx = new AudioContext();
+  let audio = await ctx.decodeAudioData(await blob.arrayBuffer());
+  ctx.close();
+  if (targetRate && audio.sampleRate !== targetRate) {
+    const off = new OfflineAudioContext(1, Math.ceil(audio.duration * targetRate), targetRate);
+    const src = off.createBufferSource();
+    src.buffer = audio; src.connect(off.destination); src.start();
+    audio = await off.startRendering();
+  }
+  const pcm = audio.getChannelData(0), rate = audio.sampleRate;
+  const out = new DataView(new ArrayBuffer(44 + pcm.length * 2));
+  const str = (o, s) => [...s].forEach((c, i) => out.setUint8(o + i, c.charCodeAt(0)));
+  str(0, 'RIFF'); out.setUint32(4, 36 + pcm.length * 2, true); str(8, 'WAVE');
+  str(12, 'fmt '); out.setUint32(16, 16, true); out.setUint16(20, 1, true); out.setUint16(22, 1, true);
+  out.setUint32(24, rate, true); out.setUint32(28, rate * 2, true); out.setUint16(32, 2, true);
+  out.setUint16(34, 16, true); str(36, 'data'); out.setUint32(40, pcm.length * 2, true);
+  for (let i = 0; i < pcm.length; i++) {
+    const s = Math.max(-1, Math.min(1, pcm[i]));
+    out.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+  }
+  return new Blob([out], { type: 'audio/wav' });
+}
+
+/* ---------- Assistant state ---------- */
+const CONVO = 'voiceStudio.conversation';
+const MAX_TALK_SECONDS = 60;
+const LANG_LABEL = { en: 'English', ta: 'தமிழ்' };
+const STATUS = {
+  idle: 'Tap to speak',
+  connecting: 'Connecting to microphone…',
+  listening: 'Listening…',
+  thinking: 'Thinking…',
+  speaking: 'Speaking…',
+};
+const SUB = {
+  idle: 'தமிழில் பேசுங்கள் — or speak English.',
+  connecting: 'Allow microphone access if your browser asks',
+  listening: "Speak now — tap again when you're done",
+  thinking: '',
+  speaking: 'Tap to interrupt',
+};
+let state = 'idle';
+let conversationId = store.get(CONVO) || '';
+let history = []; // {role, text} of this conversation, sent with each turn
+let speakingAudio = null;
+
+function setState(next) {
+  state = next;
+  document.body.dataset.state = next;
+  $('status').textContent = STATUS[next];
+  $('status').className = 'status';
+  $('sub').textContent = SUB[next];
+  $('talkBtn').setAttribute('aria-label', STATUS[next]);
+  updateControls();
+}
+function setStatus(text, isError) {
+  $('status').textContent = text;
+  $('status').className = 'status' + (isError ? ' err' : '');
+  $('sub').textContent = isError ? 'Tap to try again' : SUB[state];
+}
+function updateControls() {
+  const ready = voicePickers.en.value && voicePickers.ta.value;
+  $('deleteBtn').disabled = !$('deleteSelect').value;
+  $('talkBtn').disabled = !ready || state === 'thinking' || state === 'connecting';
+}
+
+/* ---------- Transcript ---------- */
+function bubble(role, text, language) {
+  $('chatEmpty').hidden = true;
+  const el = document.createElement('div');
+  el.className = `bubble ${role}`;
+  const tag = document.createElement('span');
+  tag.className = 'lang';
+  tag.textContent = [role.startsWith('user') ? 'Input' : 'Output', LANG_LABEL[language] || language]
+    .filter(Boolean).join(' · ');
+  el.append(tag);
+  const body = document.createElement('div');
+  body.textContent = text;
+  el.append(body);
+  $('chat').append(el);
+  $('chat').scrollTop = $('chat').scrollHeight;
+  return el;
+}
+
+function pauseOthers(except) {
+  document.querySelectorAll('#chat audio').forEach(a => a !== except && a.pause());
+}
+
+// Fetch reply audio and start playing it while it is still arriving (Media
+// Source Extensions), collecting it for replay and download as well.
+// Playback starts only once ~2 s is buffered: ElevenLabs sends audio 3-4x
+// faster than real time, so after that head start playback never catches up
+// with the download (starting on the first bytes made speech break up).
+// Browsers without MSE for MP3 wait for the whole file instead.
+const PREBUFFER_BYTES = 32000;  // ~2 s of 128 kbps MP3
+const APPEND_BYTES = 16000;     // feed the decoder ~1 s at a time, not tiny chunks
+async function streamAudio(url, audio, autoplay) {
+  const r = await api(url);
+  const MS = window.ManagedMediaSource || window.MediaSource;
+  if (!(MS && MS.isTypeSupported && MS.isTypeSupported('audio/mpeg') && r.body)) {
+    const blob = await r.blob();
+    audio.src = URL.createObjectURL(blob);
+    if (autoplay) audio.play().catch(() => {});
+    return blob;
+  }
+  const ms = new MS();
+  audio.disableRemotePlayback = true; // required by Safari's ManagedMediaSource
+  audio.src = URL.createObjectURL(ms);
+  await new Promise(res => ms.addEventListener('sourceopen', res, { once: true }));
+  const sb = ms.addSourceBuffer('audio/mpeg');
+  const reader = r.body.getReader(), parts = [];
+  let pending = [], pendingBytes = 0, received = 0, started = false;
+
+  async function flush() {
+    if (!pendingBytes) return;
+    const piece = new Uint8Array(pendingBytes);
+    let at = 0;
+    for (const p of pending) { piece.set(p, at); at += p.length; }
+    pending = []; pendingBytes = 0;
+    sb.appendBuffer(piece);
+    await new Promise(res => sb.addEventListener('updateend', res, { once: true }));
+  }
+  function maybeStart(force) {
+    if (!started && autoplay && (force || received >= PREBUFFER_BYTES)) {
+      started = true;
+      audio.play().catch(() => {});
+    }
+  }
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    parts.push(value); pending.push(value);
+    pendingBytes += value.length; received += value.length;
+    if (pendingBytes >= APPEND_BYTES || (!started && received >= PREBUFFER_BYTES)) {
+      await flush();
+      maybeStart(false);
+    }
+  }
+  await flush();
+  if (ms.readyState === 'open') ms.endOfStream();
+  maybeStart(true); // short replies: play once everything has arrived
+  return new Blob(parts, { type: 'audio/mpeg' });
+}
+
+// Assistant bubble with Play/Pause and Download. Audio is generated on first
+// use (immediately when autoplay is set) and reused after that.
+function botBubble(text, language, audioUrl, autoplay, onFirstPlaying) {
+  const el = bubble('bot', text, language);
+  const tools = document.createElement('div');
+  tools.className = 'tools';
+  tools.innerHTML = `
+    <button class="icon-btn play"><svg><use href="#i-play"/></svg><span>Play</span></button>
+    <button class="icon-btn dl"><svg><use href="#i-down"/></svg><span>Download</span></button>
+    <span class="note"></span>`;
+  el.append(tools);
+  const audio = new Audio();
+  const playBtn = tools.querySelector('.play'), dlBtn = tools.querySelector('.dl'), note = tools.querySelector('.note');
+  const playIcon = (icon, label) => {
+    playBtn.querySelector('use').setAttribute('href', icon);
+    playBtn.querySelector('span').textContent = label;
+  };
+  let reportedPlaying = false;
+  audio.onplaying = () => {
+    if (!reportedPlaying) { reportedPlaying = true; onFirstPlaying?.(); }
+  };
+  audio.onplay = () => {
+    playIcon('#i-pause', 'Pause');
+    speakingAudio = audio;
+    if (state !== 'listening') setState('speaking');
+  };
+  audio.onpause = audio.onended = () => {
+    playIcon('#i-play', 'Play');
+    if (speakingAudio === audio) { speakingAudio = null; if (state === 'speaking') setState('idle'); }
+  };
+  el.append(audio);
+  const timing = document.createElement('div');
+  timing.className = 'timing';
+  el.append(timing);
+  el.timing = timing;
+
+  let loading = null, blob = null;
+  function load(play) {
+    if (!loading) {
+      note.textContent = play ? '' : 'Loading audio…';
+      loading = streamAudio(audioUrl, audio, play)
+        .then(b => { blob = b; note.textContent = ''; return b; })
+        .catch(e => { loading = null; note.textContent = e.message; throw e; });
+    }
+    return loading;
+  }
+  playBtn.onclick = () => {
+    pauseOthers(audio);
+    if (!loading) return load(true).catch(() => {});
+    if (audio.paused) {
+      if (audio.ended) audio.currentTime = 0;
+      audio.play().catch(() => {});
+    } else audio.pause();
+  };
+  dlBtn.onclick = async () => {
+    try {
+      await load(false);
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+      const href = URL.createObjectURL(blob);
+      Object.assign(document.createElement('a'), { href, download: `reply-${stamp}.mp3` }).click();
+      setTimeout(() => URL.revokeObjectURL(href), 10000);
+    } catch (e) { note.textContent = e.message; }
+  };
+  if (autoplay) {
+    pauseOthers(audio);
+    // If the browser blocked autoplay, fall back to idle; the Play button still works.
+    const settle = () => { if (state === 'speaking' && !speakingAudio) setState('idle'); };
+    load(true).then(() => setTimeout(settle, 300), settle);
+  }
+  return el;
+}
+
+const replyAudioUrl = (conv, msg) => `/api/conversations/${conv}/messages/${msg}/audio`;
+
+// Only the latest exchange is shown; earlier turns are still sent to Gemini as context.
+function clearShown() {
+  document.querySelectorAll('#chat .bubble').forEach(b => {
+    b.querySelector('audio')?.pause();
+    b.remove();
+  });
+}
+
+const sec = ms => ms == null ? '–' : `${(ms / 1000).toFixed(2)} s`;
+function showTiming(el, m) {
+  const parts = [
+    m.record_ms != null && `spoke ${sec(m.record_ms)}`,
+    `gemini ${sec(m.gemini_ms)}`,
+    `server ${sec(m.server_ms)}`,
+    `round trip ${sec(m.chat_roundtrip_ms)}`,
+    m.audio_start_ms != null && `voice +${sec(m.audio_start_ms)}`,
+    m.end_to_end_ms != null && `end-to-end ${sec(m.end_to_end_ms)}`,
+    `${m.reply_chars} chars`,
+    m.prompt_tokens != null && `${m.prompt_tokens}→${m.output_tokens} tokens`,
+  ].filter(Boolean);
+  el.timing.textContent = parts.join(' · ');
+}
+
+async function sendTurn(form, clientTiming = {}) {
+  setState('thinking');
+  clearShown();
+  const thinking = bubble('bot pending', '…');
+  form.append('voice_en', voicePickers.en.value);
+  form.append('voice_ta', voicePickers.ta.value);
+  if (conversationId) form.append('conversation_id', conversationId);
+  form.append('history', JSON.stringify(history.slice(-20)));
+  try {
+    const sentAt = performance.now();
+    const res = await (await api('/api/chat', { method: 'POST', body: form })).json();
+    const gotReplyAt = performance.now();
+    const m = { ...res.metrics, ...clientTiming, chat_roundtrip_ms: Math.round(gotReplyAt - sentAt) };
+    conversationId = res.conversation_id; store.set(CONVO, conversationId);
+    thinking.remove();
+    bubble('user', res.transcript, res.language);
+    history.push({ role: 'user', text: res.transcript }, { role: 'assistant', text: res.reply });
+    setState('speaking');
+    const out = botBubble(res.reply, res.language, replyAudioUrl(conversationId, res.message_id), true, () => {
+      const now = performance.now();
+      m.audio_start_ms = Math.round(now - gotReplyAt);
+      if (clientTiming.stopped_at) m.end_to_end_ms = Math.round(now - clientTiming.stopped_at);
+      showTiming(out, m);
+      const { record_ms, upload_bytes, chat_roundtrip_ms, audio_start_ms, end_to_end_ms, client_wav_ms } = m;
+      fetch(`/api/metrics/${res.message_id}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ record_ms, upload_bytes, chat_roundtrip_ms, audio_start_ms, end_to_end_ms, client_wav_ms }),
+      }).catch(() => {});
+    });
+    showTiming(out, m);
+  } catch (e) {
+    thinking.remove();
+    setState('idle');
+    setStatus(e.message, true);
+  }
+}
+
+/* ---------- Tap to talk ---------- */
+// The microphone is opened once and kept open for the visit, so only the first
+// tap pays the connection delay (and none at all when permission was already
+// granted: it is warmed up on page load). Audio is only recorded between taps.
+let mic = null; // { stream, ctx, analyser }
+let micOpening = null;
+function micLive() {
+  return mic && mic.stream.getAudioTracks().some(t => t.readyState === 'live');
+}
+function openMic() {
+  if (micLive()) return Promise.resolve(mic);
+  if (!micOpening) {
+    micOpening = navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+    }).then(stream => {
+      const ctx = new AudioContext(), analyser = ctx.createAnalyser();
+      analyser.fftSize = 1024;
+      ctx.createMediaStreamSource(stream).connect(analyser);
+      mic = { stream, ctx, analyser };
+      return mic;
+    }).finally(() => { micOpening = null; });
+  }
+  return micOpening;
+}
+// Warm up without a prompt if this site already has microphone permission.
+navigator.permissions?.query({ name: 'microphone' })
+  .then(p => { if (p.state === 'granted') openMic().catch(() => {}); })
+  .catch(() => {});
+
+let talk = null;
+$('talkBtn').onclick = async () => {
+  if (state === 'listening' && talk) return talk.finish();
+  if (state === 'thinking' || state === 'connecting') return;
+  if (speakingAudio) speakingAudio.pause(); // a tap while speaking interrupts
+  pauseOthers(null);
+
+  if (!micLive()) setState('connecting');
+  try {
+    await openMic();
+  } catch (e) {
+    setState('idle');
+    return setStatus(`Microphone unavailable: ${e.message}`, true);
+  }
+  if (mic.ctx.state === 'suspended') mic.ctx.resume();
+  const rec = new MediaRecorder(mic.stream), parts = [];
+  rec.ondataavailable = e => e.data.size && parts.push(e.data);
+  const buf = new Float32Array(mic.analyser.fftSize);
+  let raf;
+  (function draw() {
+    mic.analyser.getFloatTimeDomainData(buf);
+    const rms = Math.sqrt(buf.reduce((a, v) => a + v * v, 0) / buf.length);
+    $('orbWrap').style.setProperty('--level', Math.min(1, rms * 6).toFixed(3));
+    raf = requestAnimationFrame(draw);
+  })();
+  const started = performance.now();
+  const limit = setTimeout(() => talk?.finish(), MAX_TALK_SECONDS * 1000);
+
+  talk = {
+    finish() {
+      clearTimeout(limit); cancelAnimationFrame(raf);
+      $('orbWrap').style.setProperty('--level', 0);
+      const stoppedAt = performance.now();
+      rec.onstop = async () => {
+        if (stoppedAt - started < 600) {
+          setState('idle');
+          return setStatus('That was very short — tap, speak, then tap again.', true);
+        }
+        try {
+          const wavStart = performance.now();
+          const wav = await toWav(new Blob(parts, { type: rec.mimeType }), 16000);
+          const form = new FormData();
+          form.append('audio', wav, 'speech.wav');
+          await sendTurn(form, {
+            stopped_at: stoppedAt,
+            record_ms: Math.round(stoppedAt - started),
+            client_wav_ms: Math.round(performance.now() - wavStart),
+            upload_bytes: wav.size,
+          });
+        } catch (e) {
+          setState('idle');
+          setStatus(`Could not process recording: ${e.message}`, true);
+        }
+      };
+      rec.stop();
+      talk = null;
+      setState('thinking');
+    },
+  };
+  rec.start(250);
+  setState('listening');
+};
+
+/* ---------- Conversations ---------- */
+$('newChatBtn').onclick = () => {
+  if (state === 'listening' || state === 'thinking') return;
+  if (speakingAudio) speakingAudio.pause();
+  conversationId = ''; store.set(CONVO, ''); history = [];
+  clearShown();
+  $('chatEmpty').hidden = false;
+  setState('idle');
+};
+
+async function restoreConversation() {
+  if (!conversationId) return;
+  try {
+    const { messages } = await (await api(`/api/conversations/${conversationId}`)).json();
+    history = messages.map(m => ({ role: m.role, text: m.text }));
+    const lastUser = messages.map(m => m.role).lastIndexOf('user');
+    for (const m of lastUser < 0 ? [] : messages.slice(lastUser)) {
+      if (m.role === 'user') bubble('user', m.text, m.language);
+      else botBubble(m.text, m.language, replyAudioUrl(conversationId, m.id), false);
+    }
+  } catch {
+    conversationId = ''; store.set(CONVO, '');
+  }
+}
+
+/* ---------- Stats ---------- */
+const esc = v => String(v ?? '–').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const fmtMs = v => v == null ? '–' : (v >= 1000 ? `${(v / 1000).toFixed(2)} s` : `${v} ms`);
+const fmtNum = v => v == null ? '–' : Number(v).toLocaleString();
+function statTable(title, rows, fmt) {
+  const body = Object.entries(rows).map(([name, s]) => s
+    ? `<tr><td>${esc(name)}</td><td>${s.n}</td><td>${fmt(s.p50)}</td><td>${fmt(s.p90)}</td><td>${fmt(s.p95)}</td><td>${fmt(s.max)}</td><td>${fmt(s.mean)}</td></tr>`
+    : `<tr><td>${esc(name)}</td><td>0</td><td colspan="5">no data yet</td></tr>`).join('');
+  return `<section><h3>${title}</h3><div class="table-wrap"><table>
+    <tr><th>Metric</th><th>n</th><th>p50</th><th>p90</th><th>p95</th><th>max</th><th>mean</th></tr>${body}</table></div></section>`;
+}
+async function loadStats() {
+  $('statsBody').textContent = 'Loading…';
+  try {
+    const d = await (await api(`/api/stats?days=${$('statsDays').value}`)).json();
+    const t = d.today, plan = d.elevenlabs_plan;
+    const pct = Math.min(100, Math.round(100 * t.tts_chars / t.daily_char_limit));
+    const planPct = plan ? Math.min(100, Math.round(100 * plan.characters_used / plan.characters_limit)) : 0;
+    const usage = d.daily_usage.map(u => `<tr><td>${esc(u.date)}</td><td>${fmtNum(u.turns)}</td><td>${fmtNum(u.tts_requests)}</td><td>${fmtNum(u.tts_chars)}</td><td>${fmtNum(u.errors)}</td></tr>`).join('');
+    const fails = Object.entries(d.turns.failures_by_stage).map(([k, v]) => `${esc(k)}: ${v}`).join(', ') || 'none';
+    $('statsBody').innerHTML = `
+      <section><h3>Today (${esc(t.date)}, India time)</h3><div class="tiles">
+        <div class="tile"><div class="v">${fmtNum(t.tts_chars)}</div><div class="k">of ${fmtNum(t.daily_char_limit)} daily characters</div><div class="bar"><div style="width:${pct}%"></div></div></div>
+        <div class="tile"><div class="v">${fmtNum(t.turns)}</div><div class="k">turns</div></div>
+        <div class="tile"><div class="v">${fmtNum(t.errors)}</div><div class="k">errors</div></div>
+        ${plan ? `<div class="tile"><div class="v">${fmtNum(plan.characters_limit - plan.characters_used)}</div><div class="k">ElevenLabs credits left (${esc(plan.tier)})</div><div class="bar"><div style="width:${planPct}%"></div></div></div>` : ''}
+      </div></section>
+      <section><h3>Last ${d.window_days} day(s)</h3><div class="tiles">
+        <div class="tile"><div class="v">${fmtNum(d.turns.total)}</div><div class="k">turns</div></div>
+        <div class="tile"><div class="v">${d.turns.total ? Math.round(100 * d.turns.ok / d.turns.total) : 0}%</div><div class="k">succeeded</div></div>
+        <div class="tile"><div class="v">${fmtNum(d.turns.by_language.ta)} / ${fmtNum(d.turns.by_language.en)}</div><div class="k">தமிழ் / English</div></div>
+      </div><p class="stats-foot">Failures by stage: ${fails}</p></section>
+      ${statTable('Latency', d.latency_ms, fmtMs)}
+      ${statTable('Sizes', d.sizes, fmtNum)}
+      <section><h3>Daily usage</h3><div class="table-wrap"><table>
+        <tr><th>Date</th><th>Turns</th><th>TTS requests</th><th>TTS chars</th><th>Errors</th></tr>${usage || '<tr><td colspan="5">no data yet</td></tr>'}</table></div></section>
+      <p class="stats-foot">Models: Gemini <code>${esc(d.models.gemini)}</code>, TTS <code>${esc(d.models.tts)}</code>.
+        ${plan?.resets_at ? `ElevenLabs credits reset ${esc(new Date(plan.resets_at).toLocaleDateString())}.` : ''}
+        Raw data: <a href="/api/stats?days=${d.window_days}" target="_blank">/api/stats</a> · definitions in METRICS.md.</p>`;
+  } catch (e) {
+    $('statsBody').textContent = e.message;
+  }
+}
+$('statsBtn').onclick = () => { $('statsDlg').showModal(); loadStats(); };
+$('statsDays').onchange = loadStats;
+$('closeStats').onclick = () => $('statsDlg').close();
+$('statsDlg').addEventListener('click', e => { if (e.target === $('statsDlg')) $('statsDlg').close(); });
+
+loadVoices();
+restoreConversation();
+</script>
+</body>
+</html>

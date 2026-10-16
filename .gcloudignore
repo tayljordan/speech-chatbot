@@ -1,0 +1,6 @@
+.env
+.venv/
+recordings/
+__pycache__/
+*.wav
+*.mp3
